@@ -1,0 +1,55 @@
+# Ambiente local: adiciona PostgreSQL e Valkey (o Coolify já fornece esses serviços em produção).
+# Senhas fixas só de desenvolvimento — precisam bater com DATABASE_URL/REDIS_URL do .env.local.
+#   cp .env.local.example .env.local
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.local.yml --env-file .env.local up -d --build   (na raiz do repositório)
+
+name: netbox-local
+
+services:
+  netbox:
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: docker.io/postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: netbox-local
+    healthcheck:
+      test: pg_isready -q -t 2 -d $$POSTGRES_DB -U $$POSTGRES_USER
+      start_period: 20s
+      timeout: 30s
+      interval: 10s
+      retries: 5
+    volumes:
+      - netbox-postgres:/var/lib/postgresql
+      - ../backup:/backup:ro
+
+  redis:
+    image: docker.io/valkey/valkey:9.1-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: redis-local
+    command:
+      - sh
+      - -c
+      - valkey-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    healthcheck:
+      test: '[ "$$(valkey-cli --pass "$$REDIS_PASSWORD" --no-auth-warning ping)" = "PONG" ]'
+      start_period: 5s
+      timeout: 3s
+      interval: 2s
+      retries: 5
+    volumes:
+      - netbox-redis-data:/data
+
+volumes:
+  netbox-postgres:
+  netbox-redis-data:
