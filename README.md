@@ -45,7 +45,7 @@ Passo a passo completo, incluindo preparo do banco e restore de backup, em **[do
 
 ```bash
 cp .env.local.example .env.local
-nb() { docker compose -f infra/docker-compose.yml -f infra/docker-compose.local.yml --env-file .env.local "$@"; }
+nb() { docker compose --project-directory . -f infra/docker-compose.yml -f infra/docker-compose.local.yml --env-file .env.local "$@"; }
 nb up -d --build        # http://localhost:8080  (admin / admin)
 nb down -v              # remove tudo, inclusive dados
 ```

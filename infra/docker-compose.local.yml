@@ -1,7 +1,8 @@
 # Ambiente local: adiciona PostgreSQL e Valkey (o Coolify já fornece esses serviços em produção).
 # Senhas fixas só de desenvolvimento — precisam bater com DATABASE_URL/REDIS_URL do .env.local.
 #   cp .env.local.example .env.local
-#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.local.yml --env-file .env.local up -d --build   (na raiz do repositório)
+#   docker compose --project-directory . -f infra/docker-compose.yml -f infra/docker-compose.local.yml --env-file .env.local up -d --build
+#   (na raiz do repositório; --project-directory . faz os caminhos valerem a partir da raiz, como no Coolify)
 
 name: netbox-local
 
@@ -30,7 +31,7 @@ services:
       retries: 5
     volumes:
       - netbox-postgres:/var/lib/postgresql
-      - ../backup:/backup:ro
+      - ./backup:/backup:ro
 
   redis:
     image: docker.io/valkey/valkey:9.1-alpine

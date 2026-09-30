@@ -46,13 +46,22 @@ x-netbox-env: &netbox-env
   SUPERUSER_EMAIL: ${SUPERUSER_EMAIL:-}
   SUPERUSER_PASSWORD: ${SUPERUSER_PASSWORD:-}
 
+# Base comum dos dois serviços. Caminhos relativos à raiz do repositório
+# (o Coolify usa --project-directory na raiz; localmente, veja docker-compose.local.yml).
+x-netbox-service: &netbox-service
+  build:
+    context: .
+    dockerfile: infra/Dockerfile
+  restart: unless-stopped
+  user: "netbox:root"
+  volumes:
+    - netbox-media-files:/opt/netbox/netbox/media:rw
+    - netbox-reports-files:/opt/netbox/netbox/reports:rw
+    - netbox-scripts-files:/opt/netbox/netbox/scripts:rw
+
 services:
-  netbox: &netbox
-    build:
-      context: ..
-      dockerfile: infra/Dockerfile
-    restart: unless-stopped
-    user: "netbox:root"
+  netbox:
+    <<: *netbox-service
     environment:
       <<: *netbox-env
       # Servidor web (VPS 16 vCPU / 16 GB compartilhada com PostgreSQL e Redis)
@@ -66,16 +75,11 @@ services:
       timeout: 5s
       interval: 15s
       retries: 5
-    volumes:
-      - netbox-media-files:/opt/netbox/netbox/media:rw
-      - netbox-reports-files:/opt/netbox/netbox/reports:rw
-      - netbox-scripts-files:/opt/netbox/netbox/scripts:rw
 
   netbox-worker:
-    <<: *netbox
+    <<: *netbox-service
     environment:
       <<: *netbox-env
-    expose: []
     depends_on:
       netbox:
         condition: service_healthy

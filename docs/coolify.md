@@ -87,7 +87,7 @@ Com backup restaurado, reutilize o `API_TOKEN_PEPPER_1` antigo, senão os tokens
 
 ```bash
 cp .env.local.example .env.local
-nb() { docker compose -f infra/docker-compose.yml -f infra/docker-compose.local.yml --env-file .env.local "$@"; }
+nb() { docker compose --project-directory . -f infra/docker-compose.yml -f infra/docker-compose.local.yml --env-file .env.local "$@"; }
 nb up -d postgres redis
 nb exec -T postgres pg_restore -U netbox -d netbox --no-acl /backup/netbox_AAAA-MM-DD.dump   # opcional
 nb up -d --build        # http://localhost:8080
