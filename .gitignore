@@ -1,0 +1,21 @@
+# Segredos e variáveis reais — nunca versionar
+.env
+.env.*
+!.env.*.example
+env/
+secrets/
+
+# Backups de banco / media
+backup/
+*.sql
+*.sql.gz
+*.dump
+
+# Arquivos legados do deploy via Portainer
+docker-compose.override.yml
+docker-compose.override.yml.bak*
+logo_personalizado*.svg
+
+# Diversos
+desktop.ini
+__pycache__/
