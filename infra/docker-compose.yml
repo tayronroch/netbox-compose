@@ -1,0 +1,95 @@
+# NetBox para Coolify — usa o PostgreSQL e o Redis já existentes no Coolify.
+# Todas as variáveis ${...} aparecem na aba "Environment Variables" do Coolify.
+# Uso local: veja infra/docker-compose.local.yml e docs/coolify.md.
+
+x-netbox-env: &netbox-env
+  # Domínio / proxy
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:?informe o domínio, ex. netbox.direct.com.br}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:?ex. https://netbox.direct.com.br}
+  CORS_ORIGIN_ALLOW_ALL: ${CORS_ORIGIN_ALLOW_ALL:-false}
+  TIME_ZONE: ${TIME_ZONE:-America/Fortaleza}
+  DEBUG: ${DEBUG:-false}
+
+  # Segredos
+  SECRET_KEY: ${SECRET_KEY:?}
+  API_TOKEN_PEPPER_1: ${API_TOKEN_PEPPER_1:?}
+
+  # PostgreSQL (recurso do Coolify): postgres://netbox:senha@host:5432/netbox
+  DATABASE_URL: ${DATABASE_URL:?URL interna do PostgreSQL no Coolify}
+  DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-300}
+  DB_CONN_HEALTH_CHECKS: ${DB_CONN_HEALTH_CHECKS:-true}
+  MAX_DB_WAIT_TIME: ${MAX_DB_WAIT_TIME:-120}
+
+  # Redis (recurso do Coolify): redis://default:senha@host:6379/0 — filas no banco da URL, cache no REDIS_CACHE_DATABASE
+  REDIS_URL: ${REDIS_URL:?URL interna do Redis no Coolify}
+  REDIS_CACHE_DATABASE: ${REDIS_CACHE_DATABASE:-1}
+
+  # E-mail
+  EMAIL_SERVER: ${EMAIL_SERVER:-localhost}
+  EMAIL_PORT: ${EMAIL_PORT:-25}
+  EMAIL_USERNAME: ${EMAIL_USERNAME:-}
+  EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+  EMAIL_FROM: ${EMAIL_FROM:-netbox@localhost}
+  EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-false}
+  EMAIL_TIMEOUT: ${EMAIL_TIMEOUT:-10}
+
+  # Funcionalidades
+  GRAPHQL_ENABLED: ${GRAPHQL_ENABLED:-true}
+  METRICS_ENABLED: ${METRICS_ENABLED:-false}
+  RELEASE_CHECK_URL: ${RELEASE_CHECK_URL:-https://api.github.com/repos/netbox-community/netbox/releases}
+  MEDIA_ROOT: /opt/netbox/netbox/media
+
+  # Superusuário: use SKIP_SUPERUSER=false só no primeiro deploy (instalação limpa)
+  SKIP_SUPERUSER: ${SKIP_SUPERUSER:-true}
+  SUPERUSER_NAME: ${SUPERUSER_NAME:-admin}
+  SUPERUSER_EMAIL: ${SUPERUSER_EMAIL:-}
+  SUPERUSER_PASSWORD: ${SUPERUSER_PASSWORD:-}
+
+services:
+  netbox: &netbox
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    restart: unless-stopped
+    user: "netbox:root"
+    environment:
+      <<: *netbox-env
+      # Servidor web (VPS 16 vCPU / 16 GB compartilhada com PostgreSQL e Redis)
+      GRANIAN_WORKERS: ${GRANIAN_WORKERS:-8}
+      GRANIAN_BLOCKING_THREADS: ${GRANIAN_BLOCKING_THREADS:-2}
+    expose:
+      - "8080"
+    healthcheck:
+      test: /opt/netbox/health.sh
+      start_period: 300s
+      timeout: 5s
+      interval: 15s
+      retries: 5
+    volumes:
+      - netbox-media-files:/opt/netbox/netbox/media:rw
+      - netbox-reports-files:/opt/netbox/netbox/reports:rw
+      - netbox-scripts-files:/opt/netbox/netbox/scripts:rw
+
+  netbox-worker:
+    <<: *netbox
+    environment:
+      <<: *netbox-env
+    expose: []
+    depends_on:
+      netbox:
+        condition: service_healthy
+    command:
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - rqworker
+    healthcheck:
+      test: ps -aux | grep -v grep | grep -q rqworker || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+
+volumes:
+  netbox-media-files:
+  netbox-reports-files:
+  netbox-scripts-files:
